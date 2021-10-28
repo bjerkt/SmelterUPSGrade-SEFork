@@ -125,6 +125,7 @@ function create_smelter_recipe(recipe)
 	bulk_recipe.category = "bulksmelting"
 	bulk_recipe.enabled = false
 	bulk_recipe.name = "bulk-" .. recipe.name
+	bulk_recipe.hide_from_player_crafting = true
 	
 	data:extend({bulk_recipe})
 end
