@@ -29,7 +29,11 @@ item_centrifuge.localised_name = {"item-name.bulk-centrifuge"}
 item_centrifuge.order = "cc[bulk-centrifuge]"
 item_centrifuge.stack_size = 1
 item_centrifuge.place_result = "bulk-centrifuge"
-
+local item_smelter_hr = table.deepcopy(item_smelter)
+item_smelter_hr.name = "bulk-smelter-hr"
+item_smelter_hr.localised_name = "HR Bulk Smelter"
+item_smelter_hr.place_result = "bulk-smelter-hr"
+data:extend({item_smelter_hr})
 data:extend({item_smelter})
 data:extend({item_centrifuge})
 

@@ -1,4 +1,5 @@
 require("prototypes.constants")
+local SMELTER_HR = require("prototypes.entity.bulk-smelter-hr")
 
 function createEntityRadar(smelter_name, side_length)
 	local new_entity = util.table.deepcopy(data.raw.radar.radar)
@@ -20,6 +21,7 @@ end
 
 function create_entity(e_type)
 	local entity
+	local hr_entity
 	local r_icon
 	local ratio
 	-- Hopefully sane defaults for when something goes horribly wrong
@@ -27,32 +29,19 @@ function create_entity(e_type)
 	local scale_factor = 1
 	if e_type == "smelter" then
 		ratio = settings.startup["smelter-ratio"].value
-		--[[
-		-- Why are we not updating scale_factor if MAX_BLD_SIZE is a thing?
-		if MAX_BLD_SIZE ~= 0 then
-			edge_size = MAX_BLD_SIZE/2
-		else
-			--params: bld size, beacons on one side per bld, compression ratio
-			edge_size, scale_factor = getScaleFactors(3, 4, ratio)
-		end
-		--]]
 		edge_size, scale_factor = getScaleFactors(3, 4, ratio, MAX_BLD_SIZE)
 		entity = create_smelter(edge_size, ratio, scale_factor)
+		hr_entity = SMELTER_HR.make_smelter(entity)
+		scale_graphics(entity, scale_factor)
+		scale_graphics(hr_entity, scale_factor)
 		r_icon = "__aai-industry__/graphics/icons/industrial-furnace.png"
 		
 		if settings.startup["smelt-alt-map-color"].value then
 			entity.map_color = {143, 143, 143, 255}
+			hr_entity.map_color = {143, 143, 143, 255}
 		end
 	elseif e_type == "centrifuge" then
 		ratio = settings.startup["centrifuge-ratio"].value
-		--[[
-		-- See above comment
-		if MAX_BLD_SIZE ~= 0 then
-			edge_size = MAX_BLD_SIZE/2
-		else
-			edge_size, scale_factor = getScaleFactors(3, 4, ratio)
-		end
-		--]]
 		edge_size, scale_factor = getScaleFactors(3, 4, ratio, MAX_BLD_SIZE)
 		entity = createCentrifuge(edge_size, ratio, scale_factor)
 		r_icon = "__base__/graphics/icons/centrifuge.png"
@@ -61,7 +50,7 @@ function create_entity(e_type)
 			entity.map_color = {128, 255, 89, 255}
 		end
 	end
-
+----------------------------------------------------------
 	entity.allowed_effects = nil
 	entity.icon = nil
 	entity.icons = {
@@ -95,9 +84,44 @@ function create_entity(e_type)
 	entity.module_specification = {
 		module_slots = 0,
 	}
+--------------------------------------------------------------------
+	if e_type == "smelter" then
+		hr_entity.allowed_effects = nil
+		hr_entity.icon = nil
+		hr_entity.icons = {
+			{
+				icon = r_icon,
+				tint = building_tint,
+				icon_size = 64
+			}
+		}
+		local half_edge = edge_size
+		hr_entity.collision_box = {
+			-- half_edge away from origin, then in by 0.2
+			{-1*half_edge + 0.2,-1*half_edge + 0.2},
+			{ half_edge - 0.2, half_edge - 0.2}
+		}
+		hr_entity.selection_box = {
+			{ -1*half_edge, -1*half_edge },
+			{  half_edge,  half_edge }
+		}
+		hr_entity.drawing_box = {
+			{ -1*half_edge, -1*half_edge },
+			{  half_edge,  half_edge }
+		}
+		hr_entity.minable = {
+			mining_time = 0.2,
+			result = "bulk-smelter-hr"
+		}
+		hr_entity.module_specification = {
+			module_slots = 0,
+		}
+		data:extend({hr_entity})
+	end
 	-- Why are we making radars? Should just be a simple crafting entity
 	--createEntityRadar(entity.name, edge_size)
 	data:extend({entity})
+	
 end
 
 function getScaleFactors(base_building_side_len, beacons_on_side, bld_count, building_side_len_max)
@@ -170,20 +194,19 @@ function scale_animation(anim, scale_factor, shift_offset_factor)
 		animation.shift[1] = animation.shift[1] * scale_factor * SCALE_TWEAK * shift_offset_factor
 		animation.shift[2] = animation.shift[2] * scale_factor * SCALE_TWEAK * shift_offset_factor
 	end
-	animation.animation_speed = 1
+	--animation.animation_speed = 1
 	-- High resolution animation exists, scale it
 	if animation.hr_version then
 		animation.hr_version.scale = animation.hr_version.scale * scale_factor * SCALE_TWEAK
 		animation.hr_version.shift[1] = animation.hr_version.shift[1] * scale_factor * SCALE_TWEAK * shift_offset_factor
 		animation.hr_version.shift[2] = animation.hr_version.shift[2] * scale_factor * SCALE_TWEAK * shift_offset_factor
-		animation.hr_version.animation_speed = 1
+		--animation.hr_version.animation_speed = 1
 	end
 	return animation
 end
 
 function create_smelter(edge_size, ratio, scale_factor)
 	local entity
-	
 	entity = table.deepcopy(data.raw["assembling-machine"]["industrial-furnace"])
 	entity.base_productivity = smelter_productivity_factor
 	entity.crafting_speed = smelter_total_speed_bonus
@@ -194,15 +217,10 @@ function create_smelter(edge_size, ratio, scale_factor)
 	entity.result_inventory_size = r_output_windows_needed
 	-- Delete the fluid_boxes instead of messing around with scaling them. Problem for later.
 	entity.fluid_boxes = nil
-	--[[
-	for _,box in pairs(entity.fluid_boxes) do
-		if type(box) == "table" then
-		end
-	end
-	--]]
-	--For reasons I don't understand, the offsets need additional padding to scale correctly on top of the building scale itself.
-	-- This seems to have resolved on its own or in a base game update
-	local OFFSET_SCALING_FACTOR = 1--.95
+	return entity
+end
+function scale_graphics(entity, scale_factor)
+	local OFFSET_SCALING_FACTOR = 1
 	entity.scale_entity_info_icon = true
 	entity.alert_icon_scale = scale_factor
 	-- Animation is table of layers
@@ -229,7 +247,6 @@ function create_smelter(edge_size, ratio, scale_factor)
 			end
 		end
 	end
-	
 	local edge_art = {
 		filename = "__SmelterUPSGrade-SEFork__/graphics/smelter_border.png",
 		frame_count = 1,
@@ -238,9 +255,7 @@ function create_smelter(edge_size, ratio, scale_factor)
 		scale = scale_factor * 0.749,
 		width = 256,
 	}
-	
 	table.insert(entity.animation.layers, edge_art)
-	return entity
 end
 
 function createCentrifuge(edge_size, ratio, scale_factor)	
